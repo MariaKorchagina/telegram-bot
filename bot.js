@@ -4,6 +4,10 @@ require('dotenv').config();
 // Создаем экземпляр бота
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
+// Администратор бота
+const ADMIN_PHONE = "+79152994659";
+const ADMIN_USERNAME = "liliya_fit_trainer";
+
 // Данные о тренере (из сайта)
 const trainerInfo = {
   name: "Лилия Яцкая",
@@ -167,6 +171,27 @@ const quizQuestions = [
 // Хранилище состояний пользователей
 const userStates = new Map();
 
+// Функция проверки администратора
+function isAdmin(user) {
+  // Проверяем по номеру телефона или username
+  return user.phone_number === ADMIN_PHONE || 
+         user.username === ADMIN_USERNAME ||
+         user.id === 123456789; // Можно добавить конкретный user ID
+}
+
+// Функция отправки уведомления администратору
+async function notifyAdmin(message) {
+  try {
+    // Попробуем найти администратора по username
+    const adminChat = await bot.getChat(`@${ADMIN_USERNAME}`);
+    if (adminChat) {
+      await bot.sendMessage(adminChat.id, message);
+    }
+  } catch (error) {
+    console.log('Не удалось отправить уведомление администратору:', error.message);
+  }
+}
+
 // Главное меню
 const mainMenu = {
   reply_markup: {
@@ -194,22 +219,70 @@ const programsMenu = {
 };
 
 // Обработчик команды /start
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
+  const user = msg.from;
+  
   const welcomeText = `👋 Привет! Я бот-помощник Лилии Яцкой - персонального тренера.
 
 ${trainerInfo.description}
 
 Выберите, что вас интересует:`;
 
+  // Отправляем уведомление администратору о новом пользователе
+  await notifyAdmin(`🆕 Новый пользователь запустил бота:
+👤 Имя: ${user.first_name} ${user.last_name || ''}
+🆔 ID: ${user.id}
+📱 Username: @${user.username || 'не указан'}
+📞 Телефон: ${user.phone_number || 'не указан'}`);
+
   bot.sendMessage(chatId, welcomeText, mainMenu);
 });
 
 // Обработчик текстовых сообщений
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   const userId = msg.from.id;
+  const user = msg.from;
+
+  // Проверяем команды администратора
+  if (isAdmin(user)) {
+    if (text === '/admin') {
+      const adminText = `👑 *Панель администратора*
+
+📊 *Статистика бота:*
+• Активных пользователей: ${userStates.size}
+• Время работы: ${Math.floor(process.uptime())} секунд
+
+🔧 *Доступные команды:*
+• /stats - статистика пользователей
+• /broadcast <сообщение> - рассылка всем пользователям
+• /users - список активных пользователей
+• /help - помощь по командам`;
+
+      bot.sendMessage(chatId, adminText, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    if (text.startsWith('/broadcast ')) {
+      const message = text.replace('/broadcast ', '');
+      // Здесь можно добавить рассылку всем пользователям
+      bot.sendMessage(chatId, `📢 Рассылка отправлена: "${message}"`);
+      return;
+    }
+
+    if (text === '/stats') {
+      const statsText = `📊 *Статистика бота*
+
+👥 Активных пользователей: ${userStates.size}
+⏰ Время работы: ${Math.floor(process.uptime() / 60)} минут
+💾 Использование памяти: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`;
+
+      bot.sendMessage(chatId, statsText, { parse_mode: 'Markdown' });
+      return;
+    }
+  }
 
   // Проверяем, находится ли пользователь в процессе квиза
   if (userStates.has(userId) && userStates.get(userId).inQuiz) {
@@ -359,7 +432,7 @@ ${question.question}
 }
 
 // Функция обработки ответов квиза
-function handleQuizAnswer(chatId, userId, text) {
+async function handleQuizAnswer(chatId, userId, text) {
   const userState = userStates.get(userId);
   const currentQuestionIndex = userState.currentQuestion;
   const question = quizQuestions[currentQuestionIndex];
@@ -400,12 +473,12 @@ ${nextQuestion.question}
     bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...keyboard });
   } else {
     // Квиз завершен, показываем результат
-    showQuizResult(chatId, userId);
+    await showQuizResult(chatId, userId);
   }
 }
 
 // Функция показа результата квиза
-function showQuizResult(chatId, userId) {
+async function showQuizResult(chatId, userId) {
   const userState = userStates.get(userId);
   const answers = userState.answers;
 
@@ -483,6 +556,22 @@ ${program.features.map(item => `• ${item}`).join('\n')}
   };
 
   bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...menu });
+
+  // Получаем информацию о пользователе для уведомления
+  try {
+    const userInfo = await bot.getChat(userId);
+    await notifyAdmin(`🎯 Пользователь завершил подбор программы:
+👤 Имя: ${userInfo.first_name} ${userInfo.last_name || ''}
+🆔 ID: ${userId}
+📱 Username: @${userInfo.username || 'не указан'}
+🎯 Рекомендованная программа: ${program.name}
+💰 Цена: ${program.price}`);
+  } catch (error) {
+    await notifyAdmin(`🎯 Пользователь завершил подбор программы:
+🆔 ID: ${userId}
+🎯 Рекомендованная программа: ${program.name}
+💰 Цена: ${program.price}`);
+  }
 
   // Очищаем состояние пользователя
   userStates.delete(userId);
@@ -712,3 +801,6 @@ bot.on('polling_error', (error) => {
 });
 
 console.log('🤖 Бот запущен и готов к работе!');
+
+// Уведомляем администратора о запуске бота
+notifyAdmin('🚀 Бот успешно запущен и готов к работе!');
