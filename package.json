@@ -1,0 +1,40 @@
+{
+  "name": "liliya-fitness-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for fitness trainer Liliya Yatskaya with interactive quiz and program recommendations",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node bot.js",
+    "test": "echo \"Run manual tests using TESTING.md\" && exit 0",
+    "lint": "echo \"No linter configured\" && exit 0"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "fitness",
+    "trainer",
+    "liliya",
+    "quiz",
+    "recommendations",
+    "workout",
+    "programs"
+  ],
+  "author": "Maria Korchagina",
+  "license": "ISC",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MariaKorchagina/liliya-fitness-telegram-bot"
+  },
+  "bugs": {
+    "url": "https://github.com/MariaKorchagina/liliya-fitness-telegram-bot/issues"
+  },
+  "homepage": "https://github.com/MariaKorchagina/liliya-fitness-telegram-bot#readme"
+}
